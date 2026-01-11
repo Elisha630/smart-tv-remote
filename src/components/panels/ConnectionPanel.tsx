@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, Wifi, WifiOff, Monitor, Smartphone } from 'lucide-react';
+import { X, RefreshCw, Wifi, WifiOff, Monitor, Check, MoreVertical } from 'lucide-react';
 import { Device } from '@/types/adb';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
 
 interface ConnectionPanelProps {
   isOpen: boolean;
@@ -12,7 +14,14 @@ interface ConnectionPanelProps {
   onScan: () => void;
   onConnect: (device: Device) => void;
   connectedDevice: Device | null;
+  connectedDevices: Device[];
   onDisconnect: () => void;
+  onDisconnectDevice: (device: Device) => void;
+  multiSelectMode: boolean;
+  onToggleMultiSelect: () => void;
+  selectedDevices: Device[];
+  onToggleDeviceSelection: (device: Device) => void;
+  onConnectSelected: () => void;
 }
 
 export const ConnectionPanel = ({
@@ -23,7 +32,14 @@ export const ConnectionPanel = ({
   onScan,
   onConnect,
   connectedDevice,
+  connectedDevices = [],
   onDisconnect,
+  onDisconnectDevice,
+  multiSelectMode = false,
+  onToggleMultiSelect,
+  selectedDevices = [],
+  onToggleDeviceSelection,
+  onConnectSelected,
 }: ConnectionPanelProps) => {
   return (
     <AnimatePresence>
@@ -52,14 +68,24 @@ export const ConnectionPanel = ({
                 <Wifi className="w-5 h-5 text-primary" />
                 Connections
               </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={multiSelectMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={onToggleMultiSelect}
+                  className="text-xs"
+                >
+                  {multiSelectMode ? 'Exit Multi' : 'Multi-TV'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
 
             {/* Content */}
@@ -75,8 +101,58 @@ export const ConnectionPanel = ({
                 {isScanning ? 'Scanning network...' : 'Scan for devices'}
               </Button>
 
-              {/* Connected Device */}
-              {connectedDevice && (
+              {/* Multi-select connect button */}
+              {multiSelectMode && selectedDevices.length > 0 && (
+                <Button
+                  onClick={onConnectSelected}
+                  className="w-full gap-2"
+                >
+                  <Monitor className="w-4 h-4" />
+                  Connect to {selectedDevices.length} device(s)
+                </Button>
+              )}
+
+              {/* Connected Devices */}
+              {connectedDevices.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-primary">
+                    Connected ({connectedDevices.length})
+                  </h3>
+                  {connectedDevices.map((device) => (
+                    <div 
+                      key={device.id}
+                      className="p-3 rounded-xl bg-primary/10 border border-primary/30"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                            <Monitor className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm">{device.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {device.ip}:{device.port}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="connection-dot connected" />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => onDisconnectDevice(device)}
+                          >
+                            Disconnect
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Legacy single device connection */}
+              {!multiSelectMode && connectedDevice && connectedDevices.length === 0 && (
                 <div className="p-3 rounded-xl bg-primary/10 border border-primary/30">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -114,8 +190,14 @@ export const ConnectionPanel = ({
                   <DeviceCard
                     key={device.id}
                     device={device}
-                    isConnected={connectedDevice?.id === device.id}
-                    onConnect={() => onConnect(device)}
+                    isConnected={
+                      connectedDevice?.id === device.id || 
+                      connectedDevices.some(d => d.id === device.id)
+                    }
+                    isSelected={selectedDevices.some(d => d.id === device.id)}
+                    multiSelectMode={multiSelectMode}
+                    onConnect={() => multiSelectMode ? onToggleDeviceSelection(device) : onConnect(device)}
+                    onToggleSelect={() => onToggleDeviceSelection(device)}
                   />
                 ))}
 
@@ -138,14 +220,19 @@ export const ConnectionPanel = ({
 interface DeviceCardProps {
   device: Device;
   isConnected: boolean;
+  isSelected: boolean;
+  multiSelectMode: boolean;
   onConnect: () => void;
+  onToggleSelect: () => void;
 }
 
-const DeviceCard = ({ device, isConnected, onConnect }: DeviceCardProps) => (
+const DeviceCard = ({ device, isConnected, isSelected, multiSelectMode, onConnect, onToggleSelect }: DeviceCardProps) => (
   <motion.div
     className={`p-3 rounded-xl border transition-colors cursor-pointer
       ${isConnected 
         ? 'bg-primary/10 border-primary/30' 
+        : isSelected
+        ? 'bg-blue-500/10 border-blue-500/30'
         : 'bg-secondary/50 border-border/30 hover:border-primary/50'
       }`}
     whileHover={{ scale: 1.02 }}
@@ -153,10 +240,18 @@ const DeviceCard = ({ device, isConnected, onConnect }: DeviceCardProps) => (
     onClick={onConnect}
   >
     <div className="flex items-center gap-3">
+      {multiSelectMode && (
+        <Checkbox
+          checked={isSelected || isConnected}
+          onCheckedChange={() => onToggleSelect()}
+          onClick={(e) => e.stopPropagation()}
+          className="data-[state=checked]:bg-primary"
+        />
+      )}
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center
-        ${isConnected ? 'bg-primary/20' : 'bg-secondary'}`}
+        ${isConnected ? 'bg-primary/20' : isSelected ? 'bg-blue-500/20' : 'bg-secondary'}`}
       >
-        <Monitor className={`w-5 h-5 ${isConnected ? 'text-primary' : 'text-muted-foreground'}`} />
+        <Monitor className={`w-5 h-5 ${isConnected ? 'text-primary' : isSelected ? 'text-blue-400' : 'text-muted-foreground'}`} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-medium text-sm truncate">{device.name}</div>
@@ -171,6 +266,9 @@ const DeviceCard = ({ device, isConnected, onConnect }: DeviceCardProps) => (
       </div>
       {isConnected && (
         <div className="connection-dot connected" />
+      )}
+      {isSelected && !isConnected && (
+        <Check className="w-4 h-4 text-blue-400" />
       )}
     </div>
   </motion.div>
