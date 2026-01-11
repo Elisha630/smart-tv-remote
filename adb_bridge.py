@@ -270,6 +270,52 @@ class ADBBridge:
         )
         return success
 
+    async def take_screenshot(self) -> Optional[bytes]:
+        """Capture a screenshot from the device."""
+        if not self.connected_device:
+            return None
+        
+        try:
+            # Take screenshot and get raw PNG data
+            cmd = ['adb', '-s', f'{self.connected_device.ip}:{self.connected_device.port}',
+                   'exec-out', 'screencap', '-p']
+            result = subprocess.run(cmd, capture_output=True, timeout=15)
+            
+            if result.returncode == 0 and result.stdout:
+                logger.info("Screenshot captured successfully")
+                return result.stdout
+            else:
+                logger.error(f"Screenshot failed: {result.stderr.decode()}")
+                return None
+        except Exception as e:
+            logger.error(f"Screenshot error: {e}")
+            return None
+
+    async def send_wake_on_lan(self, mac_address: str) -> bool:
+        """Send a Wake-on-LAN magic packet."""
+        try:
+            # Clean MAC address
+            mac = mac_address.replace(':', '').replace('-', '').upper()
+            if len(mac) != 12:
+                logger.error(f"Invalid MAC address: {mac_address}")
+                return False
+            
+            # Create magic packet
+            mac_bytes = bytes.fromhex(mac)
+            magic_packet = b'\xff' * 6 + mac_bytes * 16
+            
+            # Send to broadcast address on port 9
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.sendto(magic_packet, ('255.255.255.255', 9))
+            sock.close()
+            
+            logger.info(f"Wake-on-LAN packet sent to {mac_address}")
+            return True
+        except Exception as e:
+            logger.error(f"Wake-on-LAN error: {e}")
+            return False
+
     async def handle_message(self, websocket: WebSocketServerProtocol, message: str):
         """Handle incoming WebSocket messages."""
         try:
@@ -348,6 +394,23 @@ class ADBBridge:
             elif msg_type == 'power_off':
                 success = await self.power_off()
                 response = {'type': 'powered_off', 'success': success}
+            
+            elif msg_type == 'screenshot':
+                import base64
+                screenshot_data = await self.take_screenshot()
+                if screenshot_data:
+                    response = {
+                        'type': 'screenshot',
+                        'success': True,
+                        'data': base64.b64encode(screenshot_data).decode('utf-8')
+                    }
+                else:
+                    response = {'type': 'screenshot', 'success': False}
+            
+            elif msg_type == 'wake_on_lan':
+                mac = data.get('macAddress', '')
+                success = await self.send_wake_on_lan(mac)
+                response = {'type': 'wol_sent', 'success': success}
             
             await websocket.send(json.dumps(response))
             
