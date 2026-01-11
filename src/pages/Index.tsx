@@ -15,11 +15,13 @@ import { VoiceInput } from '@/components/remote/VoiceInput';
 import { ScreenshotButton } from '@/components/remote/ScreenshotButton';
 import { ScreenMirror } from '@/components/remote/ScreenMirror';
 import { WakeOnLan } from '@/components/remote/WakeOnLan';
+import { GamepadMode } from '@/components/remote/GamepadMode';
 import { ConnectionPanel } from '@/components/panels/ConnectionPanel';
 import { AppsPanel } from '@/components/panels/AppsPanel';
 import { MenuPanel } from '@/components/panels/MenuPanel';
 import { SetupPanel } from '@/components/panels/SetupPanel';
 import { ShortcutsPanel } from '@/components/panels/ShortcutsPanel';
+import { Device } from '@/types/adb';
 import { toast } from 'sonner';
 
 const Index = () => {
@@ -61,6 +63,11 @@ const Index = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  // Multi-device state
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedDevices, setSelectedDevices] = useState<Device[]>([]);
+  const [connectedDevices, setConnectedDevices] = useState<Device[]>([]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -124,12 +131,52 @@ const Index = () => {
     toast.success('App launched');
   }, [launchApp]);
 
+  // Multi-device handlers
+  const handleToggleMultiSelect = useCallback(() => {
+    setMultiSelectMode(prev => !prev);
+    setSelectedDevices([]);
+  }, []);
+
+  const handleToggleDeviceSelection = useCallback((device: Device) => {
+    setSelectedDevices(prev => {
+      const exists = prev.some(d => d.id === device.id);
+      if (exists) {
+        return prev.filter(d => d.id !== device.id);
+      }
+      return [...prev, device];
+    });
+  }, []);
+
+  const handleConnectSelected = useCallback(() => {
+    selectedDevices.forEach(device => {
+      connect(device);
+    });
+    setConnectedDevices(prev => [...prev, ...selectedDevices.filter(
+      sd => !prev.some(pd => pd.id === sd.id)
+    )]);
+    setSelectedDevices([]);
+    toast.success(`Connecting to ${selectedDevices.length} device(s)`);
+  }, [selectedDevices, connect]);
+
+  const handleDisconnectDevice = useCallback((device: Device) => {
+    setConnectedDevices(prev => prev.filter(d => d.id !== device.id));
+    disconnect();
+    toast.info(`Disconnected from ${device.name}`);
+  }, [disconnect]);
+
   // Show error toast if connection fails
   useEffect(() => {
     if (state.error) {
       toast.error(state.error);
     }
   }, [state.error]);
+
+  // Sync connected device to multi-device list
+  useEffect(() => {
+    if (state.device && !connectedDevices.some(d => d.id === state.device?.id)) {
+      setConnectedDevices(prev => [...prev, state.device!]);
+    }
+  }, [state.device]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col safe-area-inset">
@@ -144,28 +191,13 @@ const Index = () => {
       />
 
       {/* Main Remote Area */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 gap-6 overflow-auto">
-        {/* Trackpad */}
-        <motion.section
-          className="w-full max-w-md"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Trackpad
-            onMove={moveCursor}
-            onTap={tap}
-            onScroll={scroll}
-            disabled={!state.isConnected}
-          />
-        </motion.section>
-
+      <main className="flex-1 flex flex-col items-center justify-start p-4 gap-5 overflow-auto">
         {/* D-Pad and Volume/Channel */}
         <motion.section
           className="flex items-center justify-center gap-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.1 }}
         >
           <VolumeControls onKey={sendKey} disabled={!state.isConnected} />
           <DPad onKey={sendKey} disabled={!state.isConnected} />
@@ -176,7 +208,7 @@ const Index = () => {
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.2 }}
         >
           <NavigationButtons
             onKey={sendKey}
@@ -190,7 +222,7 @@ const Index = () => {
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.3 }}
         >
           <MediaControls onKey={sendKey} disabled={!state.isConnected} />
         </motion.section>
@@ -200,7 +232,7 @@ const Index = () => {
           className="w-full max-w-md flex flex-col items-center gap-3"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.4 }}
         >
           <TextInput onSendText={sendText} disabled={!state.isConnected} />
           <VoiceInput onSendText={sendText} disabled={!state.isConnected} />
@@ -211,7 +243,7 @@ const Index = () => {
           className="w-full max-w-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.5 }}
         >
           <QuickLaunch
             shortcuts={shortcuts}
@@ -222,11 +254,17 @@ const Index = () => {
 
         {/* Extra Controls */}
         <motion.section
-          className="flex items-center gap-4 flex-wrap justify-center"
+          className="flex items-center gap-3 flex-wrap justify-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.6 }}
         >
+          <GamepadMode
+            onKey={sendKey}
+            onMove={moveCursor}
+            onTap={tap}
+            disabled={!state.isConnected}
+          />
           <ScreenMirror
             onStartMirror={startScreenMirror}
             onStopMirror={stopScreenMirror}
@@ -243,6 +281,22 @@ const Index = () => {
             onSaveMac={saveMacAddress}
           />
         </motion.section>
+
+        {/* Trackpad at Bottom */}
+        <motion.section
+          className="w-full max-w-md mt-auto"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Trackpad
+            onMove={moveCursor}
+            onTap={tap}
+            onScroll={scroll}
+            onKey={sendKey}
+            disabled={!state.isConnected}
+          />
+        </motion.section>
       </main>
 
       {/* Panels */}
@@ -254,7 +308,14 @@ const Index = () => {
         onScan={scanNetwork}
         onConnect={connect}
         connectedDevice={state.device}
+        connectedDevices={connectedDevices}
         onDisconnect={disconnect}
+        onDisconnectDevice={handleDisconnectDevice}
+        multiSelectMode={multiSelectMode}
+        onToggleMultiSelect={handleToggleMultiSelect}
+        selectedDevices={selectedDevices}
+        onToggleDeviceSelection={handleToggleDeviceSelection}
+        onConnectSelected={handleConnectSelected}
       />
 
       <AppsPanel
