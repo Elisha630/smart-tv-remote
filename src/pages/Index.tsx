@@ -11,7 +11,9 @@ import { ChannelControls } from '@/components/remote/ChannelControls';
 import { NavigationButtons } from '@/components/remote/NavigationButtons';
 import { QuickLaunch } from '@/components/remote/QuickLaunch';
 import { TextInput } from '@/components/remote/TextInput';
+import { VoiceInput } from '@/components/remote/VoiceInput';
 import { ScreenshotButton } from '@/components/remote/ScreenshotButton';
+import { ScreenMirror } from '@/components/remote/ScreenMirror';
 import { WakeOnLan } from '@/components/remote/WakeOnLan';
 import { ConnectionPanel } from '@/components/panels/ConnectionPanel';
 import { AppsPanel } from '@/components/panels/AppsPanel';
@@ -41,6 +43,9 @@ const Index = () => {
     wakeOnLan,
     savedMacAddress,
     saveMacAddress,
+    startScreenMirror,
+    stopScreenMirror,
+    getScreenFrame,
   } = useAdbConnection();
 
   const {
@@ -190,14 +195,15 @@ const Index = () => {
           <MediaControls onKey={sendKey} disabled={!state.isConnected} />
         </motion.section>
 
-        {/* Text Input for TV */}
+        {/* Text & Voice Input for TV */}
         <motion.section
-          className="w-full max-w-md"
+          className="w-full max-w-md flex flex-col items-center gap-3"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
           <TextInput onSendText={sendText} disabled={!state.isConnected} />
+          <VoiceInput onSendText={sendText} disabled={!state.isConnected} />
         </motion.section>
 
         {/* Quick Launch Shortcuts */}
@@ -221,6 +227,12 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
         >
+          <ScreenMirror
+            onStartMirror={startScreenMirror}
+            onStopMirror={stopScreenMirror}
+            onGetFrame={getScreenFrame}
+            isConnected={state.isConnected}
+          />
           <ScreenshotButton 
             onScreenshot={takeScreenshot} 
             disabled={!state.isConnected} 

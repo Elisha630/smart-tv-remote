@@ -249,6 +249,22 @@ export const useAdbConnection = () => {
     setSavedMacAddress(mac);
   }, []);
 
+  const startScreenMirror = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const sent = sendCommand({ type: 'start_mirror' });
+      // Mirror doesn't need a specific response, just check if command was sent
+      resolve(sent);
+    });
+  }, [sendCommand]);
+
+  const stopScreenMirror = useCallback(() => {
+    sendCommand({ type: 'stop_mirror' });
+  }, [sendCommand]);
+
+  const getScreenFrame = useCallback((): Promise<string | null> => {
+    return takeScreenshot();
+  }, [takeScreenshot]);
+
   return {
     state,
     apps,
@@ -269,5 +285,8 @@ export const useAdbConnection = () => {
     takeScreenshot,
     wakeOnLan,
     saveMacAddress,
+    startScreenMirror,
+    stopScreenMirror,
+    getScreenFrame,
   };
 };
