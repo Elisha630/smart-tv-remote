@@ -21,7 +21,7 @@ A web-based remote control for Android TV devices using ADB over network.
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/Elisha630/smart-tv-remote.git
-   cd android-tv-remote
+   cd smart-tv-remote
    ```
 
 2. **Install dependencies:**
@@ -60,7 +60,7 @@ A web-based remote control for Android TV devices using ADB over network.
 2. **Clone and install:**
    ```bash
    git clone https://github.com/Elisha630/smart-tv-remote.git
-   cd android-tv-remote
+   cd smart-tv-remote
    npm install
    ```
 
