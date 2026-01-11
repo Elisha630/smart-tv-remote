@@ -1,73 +1,158 @@
-# Welcome to your Lovable project
+# Android TV Remote
 
-## Project info
+A web-based remote control for Android TV devices using ADB over network.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Android TV Remote](preview.png)
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- 🎯 **Trackpad** - Control mouse cursor on your TV
+- 🎮 **D-Pad** - Navigate with directional buttons
+- 🔊 **Volume & Channel** - Control audio and channels
+- 📱 **Apps Panel** - View and launch installed apps
+- 🔌 **Network Scanner** - Auto-discover Android TV devices
+- ⌨️ **Keyboard Shortcuts** - Quick app launch with configurable shortcuts
+- 📺 **Input/Menu** - Switch inputs and access TV settings
 
-**Use Lovable**
+## Installation
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Option 1: Run as Web App (Linux/macOS/Windows)
 
-Changes made via Lovable will be committed automatically to this repo.
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd android-tv-remote
+   ```
 
-**Use your preferred IDE**
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+3. **Build the app:**
+   ```bash
+   npm run build
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+4. **Serve locally:**
+   ```bash
+   npm run preview
+   ```
 
-Follow these steps:
+5. **Run the ADB Bridge Server** (required):
+   ```bash
+   # Install Python dependencies
+   pip install websockets
+   
+   # Run the bridge server
+   python3 adb_bridge.py
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+6. Open `http://localhost:4173` in your browser
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Option 2: Build Android APK
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. **Prerequisites:**
+   - Node.js 18+
+   - Android Studio
+   - Android SDK Platform Tools (for ADB)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+2. **Clone and install:**
+   ```bash
+   git clone <your-repo-url>
+   cd android-tv-remote
+   npm install
+   ```
 
-**Edit a file directly in GitHub**
+3. **Add Android platform:**
+   ```bash
+   npx cap add android
+   ```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+4. **Build the web app:**
+   ```bash
+   npm run build
+   ```
 
-**Use GitHub Codespaces**
+5. **Sync with Capacitor:**
+   ```bash
+   npx cap sync android
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+6. **Open in Android Studio:**
+   ```bash
+   npx cap open android
+   ```
 
-## What technologies are used for this project?
+7. **Build APK:**
+   - In Android Studio: Build → Build Bundle(s) / APK(s) → Build APK(s)
+   - Or from command line: `cd android && ./gradlew assembleDebug`
 
-This project is built with:
+8. **Find your APK at:**
+   ```
+   android/app/build/outputs/apk/debug/app-debug.apk
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Setup Your Android TV
 
-## How can I deploy this project?
+1. **Enable Developer Options:**
+   - Go to Settings → About → Build number
+   - Tap "Build number" 7 times
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+2. **Enable ADB Debugging:**
+   - Go to Settings → Developer Options
+   - Enable "USB debugging"
+   - Enable "ADB over network" (or similar option)
 
-## Can I connect a custom domain to my Lovable project?
+3. **Note the IP Address:**
+   - Go to Settings → Network & Internet → Your network
+   - Note down the IP address
 
-Yes, you can!
+4. **Ensure Same Network:**
+   - Your phone/computer must be on the same WiFi network as the TV
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Usage
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+1. Start the ADB Bridge Server on your computer
+2. Open the web app or Android app
+3. Click the connection icon in the header
+4. Click "Scan for devices" to find your TV
+5. Select your device to connect
+6. Use the remote controls!
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Arrow keys | Navigate D-pad |
+| Enter | Select/OK |
+| Escape/Backspace | Back |
+| Home | Home button |
+| Space | Play/Pause |
+| Custom keys | Launch configured apps |
+
+## Troubleshooting
+
+### "Cannot connect to ADB bridge"
+- Make sure `adb_bridge.py` is running
+- Check that Python and websockets are installed
+- Verify the bridge is running on `ws://localhost:8765`
+
+### "No devices found"
+- Ensure your TV has ADB over network enabled
+- Check both devices are on the same network
+- Try manually connecting: `adb connect <TV_IP>:5555`
+
+### "Connection refused"
+- The TV may require authorization - check the TV screen for a prompt
+- Try disconnecting and reconnecting
+
+## Tech Stack
+
+- **Frontend:** React, TypeScript, Tailwind CSS, Framer Motion
+- **Mobile:** Capacitor (for Android APK)
+- **Backend:** Python WebSocket server + ADB
+
+## License
+
+MIT
