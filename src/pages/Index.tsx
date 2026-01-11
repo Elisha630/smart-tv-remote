@@ -10,6 +10,9 @@ import { VolumeControls } from '@/components/remote/VolumeControls';
 import { ChannelControls } from '@/components/remote/ChannelControls';
 import { NavigationButtons } from '@/components/remote/NavigationButtons';
 import { QuickLaunch } from '@/components/remote/QuickLaunch';
+import { TextInput } from '@/components/remote/TextInput';
+import { ScreenshotButton } from '@/components/remote/ScreenshotButton';
+import { WakeOnLan } from '@/components/remote/WakeOnLan';
 import { ConnectionPanel } from '@/components/panels/ConnectionPanel';
 import { AppsPanel } from '@/components/panels/AppsPanel';
 import { MenuPanel } from '@/components/panels/MenuPanel';
@@ -34,6 +37,10 @@ const Index = () => {
     fetchApps,
     launchApp,
     powerOff,
+    takeScreenshot,
+    wakeOnLan,
+    savedMacAddress,
+    saveMacAddress,
   } = useAdbConnection();
 
   const {
@@ -183,17 +190,45 @@ const Index = () => {
           <MediaControls onKey={sendKey} disabled={!state.isConnected} />
         </motion.section>
 
+        {/* Text Input for TV */}
+        <motion.section
+          className="w-full max-w-md"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <TextInput onSendText={sendText} disabled={!state.isConnected} />
+        </motion.section>
+
         {/* Quick Launch Shortcuts */}
         <motion.section
           className="w-full max-w-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.6 }}
         >
           <QuickLaunch
             shortcuts={shortcuts}
             onLaunch={handleLaunchApp}
             disabled={!state.isConnected}
+          />
+        </motion.section>
+
+        {/* Extra Controls */}
+        <motion.section
+          className="flex items-center gap-4 flex-wrap justify-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <ScreenshotButton 
+            onScreenshot={takeScreenshot} 
+            disabled={!state.isConnected} 
+          />
+          <WakeOnLan 
+            onWake={wakeOnLan} 
+            savedMacAddress={savedMacAddress}
+            onSaveMac={saveMacAddress}
           />
         </motion.section>
       </main>

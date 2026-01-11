@@ -21,8 +21,13 @@ export const useAdbConnection = () => {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [discoveredDevices, setDiscoveredDevices] = useState<Device[]>([]);
+  const [savedMacAddress, setSavedMacAddress] = useState<string>(() => {
+    return localStorage.getItem('tv_mac_address') || '';
+  });
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const screenshotResolveRef = useRef<((url: string | null) => void) | null>(null);
+  const wolResolveRef = useRef<((success: boolean) => void) | null>(null);
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -85,12 +90,45 @@ export const useAdbConnection = () => {
       case 'apps':
         setApps(data.apps || []);
         break;
+      case 'screenshot':
+        if (screenshotResolveRef.current) {
+          if (data.success && data.data) {
+            // Convert base64 to blob URL
+            const byteCharacters = atob(data.data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/png' });
+            const url = URL.createObjectURL(blob);
+            screenshotResolveRef.current(url);
+          } else {
+            screenshotResolveRef.current(null);
+          }
+          screenshotResolveRef.current = null;
+        }
+        break;
+      case 'wol_sent':
+        if (wolResolveRef.current) {
+          wolResolveRef.current(data.success);
+          wolResolveRef.current = null;
+        }
+        break;
       case 'error':
         setState(prev => ({
           ...prev,
           error: data.message,
           isConnecting: false,
         }));
+        if (screenshotResolveRef.current) {
+          screenshotResolveRef.current(null);
+          screenshotResolveRef.current = null;
+        }
+        if (wolResolveRef.current) {
+          wolResolveRef.current(false);
+          wolResolveRef.current = null;
+        }
         break;
     }
   }, []);
@@ -170,11 +208,53 @@ export const useAdbConnection = () => {
     sendCommand({ type: 'power_off' });
   }, [sendCommand]);
 
+  const takeScreenshot = useCallback((): Promise<string | null> => {
+    return new Promise((resolve) => {
+      screenshotResolveRef.current = resolve;
+      const sent = sendCommand({ type: 'screenshot' });
+      if (!sent) {
+        resolve(null);
+        screenshotResolveRef.current = null;
+      }
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (screenshotResolveRef.current) {
+          screenshotResolveRef.current(null);
+          screenshotResolveRef.current = null;
+        }
+      }, 10000);
+    });
+  }, [sendCommand]);
+
+  const wakeOnLan = useCallback((macAddress: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      wolResolveRef.current = resolve;
+      const sent = sendCommand({ type: 'wake_on_lan', macAddress });
+      if (!sent) {
+        resolve(false);
+        wolResolveRef.current = null;
+      }
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        if (wolResolveRef.current) {
+          wolResolveRef.current(false);
+          wolResolveRef.current = null;
+        }
+      }, 5000);
+    });
+  }, [sendCommand]);
+
+  const saveMacAddress = useCallback((mac: string) => {
+    localStorage.setItem('tv_mac_address', mac);
+    setSavedMacAddress(mac);
+  }, []);
+
   return {
     state,
     apps,
     isScanning,
     discoveredDevices,
+    savedMacAddress,
     scanNetwork,
     connect,
     disconnect,
@@ -186,5 +266,8 @@ export const useAdbConnection = () => {
     fetchApps,
     launchApp,
     powerOff,
+    takeScreenshot,
+    wakeOnLan,
+    saveMacAddress,
   };
 };
