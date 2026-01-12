@@ -1,12 +1,5 @@
 {
-  "appId": "app.lovable.8f596a4265434cc1ba4f15205f49124e",
+  "appId": "com.lovable.smarttvremote",
   "appName": "Android TV Remote",
-  "webDir": "dist",
-  "server": {
-    "url": "https://8f596a42-6543-4cc1-ba4f-15205f49124e.lovableproject.com?forceHideBadge=true",
-    "cleartext": true
-  },
-  "android": {
-    "allowMixedContent": true
-  }
+  "webDir": "dist"
 }
