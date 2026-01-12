@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, Wifi, WifiOff, Monitor, Check, MoreVertical } from 'lucide-react';
+import { X, RefreshCw, Wifi, WifiOff, Monitor, Check, Plus, Trash2 } from 'lucide-react';
 import { Device } from '@/types/adb';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 interface ConnectionPanelProps {
@@ -22,6 +23,8 @@ interface ConnectionPanelProps {
   selectedDevices: Device[];
   onToggleDeviceSelection: (device: Device) => void;
   onConnectSelected: () => void;
+  onAddDevice?: (ip: string, name?: string) => Device;
+  onRemoveDevice?: (deviceId: string) => void;
 }
 
 export const ConnectionPanel = ({
@@ -40,7 +43,34 @@ export const ConnectionPanel = ({
   selectedDevices = [],
   onToggleDeviceSelection,
   onConnectSelected,
+  onAddDevice,
+  onRemoveDevice,
 }: ConnectionPanelProps) => {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newDeviceIp, setNewDeviceIp] = useState('');
+  const [newDeviceName, setNewDeviceName] = useState('');
+
+  const handleAddDevice = useCallback(() => {
+    if (!newDeviceIp.trim()) {
+      toast.error('Please enter an IP address');
+      return;
+    }
+    
+    // Basic IP validation
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipRegex.test(newDeviceIp.trim())) {
+      toast.error('Please enter a valid IP address');
+      return;
+    }
+    
+    if (onAddDevice) {
+      const device = onAddDevice(newDeviceIp.trim(), newDeviceName.trim() || undefined);
+      toast.success(`Added ${device.name}`);
+      setNewDeviceIp('');
+      setNewDeviceName('');
+      setShowAddForm(false);
+    }
+  }, [newDeviceIp, newDeviceName, onAddDevice]);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -90,16 +120,61 @@ export const ConnectionPanel = ({
 
             {/* Content */}
             <div className="flex-1 overflow-auto p-4 space-y-4">
-              {/* Scan Button */}
-              <Button
-                onClick={onScan}
-                disabled={isScanning}
-                className="w-full gap-2"
-                variant="secondary"
-              >
-                <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-                {isScanning ? 'Scanning network...' : 'Scan for devices'}
-              </Button>
+              {/* Add Device Form */}
+              {showAddForm ? (
+                <div className="p-3 rounded-xl bg-secondary/50 border border-border/30 space-y-3">
+                  <h4 className="text-sm font-medium">Add Device Manually</h4>
+                  <Input
+                    placeholder="IP Address (e.g., 192.168.1.100)"
+                    value={newDeviceIp}
+                    onChange={(e) => setNewDeviceIp(e.target.value)}
+                    className="bg-background/50"
+                  />
+                  <Input
+                    placeholder="Device Name (optional)"
+                    value={newDeviceName}
+                    onChange={(e) => setNewDeviceName(e.target.value)}
+                    className="bg-background/50"
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={handleAddDevice} className="flex-1" size="sm">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setNewDeviceIp('');
+                        setNewDeviceName('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={onScan}
+                    disabled={isScanning}
+                    className="flex-1 gap-2"
+                    variant="secondary"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+                    {isScanning ? 'Scanning...' : 'Scan'}
+                  </Button>
+                  <Button
+                    onClick={() => setShowAddForm(true)}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </Button>
+                </div>
+              )}
 
               {/* Multi-select connect button */}
               {multiSelectMode && selectedDevices.length > 0 && (
@@ -183,7 +258,7 @@ export const ConnectionPanel = ({
               {/* Device List */}
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  {devices.length > 0 ? `Found ${devices.length} device(s)` : 'No devices found'}
+                  {devices.length > 0 ? `Saved Devices (${devices.length})` : 'No saved devices'}
                 </h3>
                 
                 {devices.map((device) => (
@@ -198,14 +273,18 @@ export const ConnectionPanel = ({
                     multiSelectMode={multiSelectMode}
                     onConnect={() => multiSelectMode ? onToggleDeviceSelection(device) : onConnect(device)}
                     onToggleSelect={() => onToggleDeviceSelection(device)}
+                    onRemove={onRemoveDevice ? () => onRemoveDevice(device.id) : undefined}
                   />
                 ))}
 
                 {devices.length === 0 && !isScanning && (
                   <div className="text-center py-8 text-muted-foreground">
                     <WifiOff className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">No Android TV devices found</p>
-                    <p className="text-xs mt-1">Make sure devices are on the same network</p>
+                    <p className="text-sm">No devices added yet</p>
+                    <p className="text-xs mt-1">Click "Add" to enter your TV's IP address</p>
+                    <p className="text-xs mt-2 text-primary/70">
+                      Find your TV's IP in Settings → Network → About
+                    </p>
                   </div>
                 )}
               </div>
@@ -224,9 +303,10 @@ interface DeviceCardProps {
   multiSelectMode: boolean;
   onConnect: () => void;
   onToggleSelect: () => void;
+  onRemove?: () => void;
 }
 
-const DeviceCard = ({ device, isConnected, isSelected, multiSelectMode, onConnect, onToggleSelect }: DeviceCardProps) => (
+const DeviceCard = ({ device, isConnected, isSelected, multiSelectMode, onConnect, onToggleSelect, onRemove }: DeviceCardProps) => (
   <motion.div
     className={`p-3 rounded-xl border transition-colors cursor-pointer
       ${isConnected 
@@ -269,6 +349,19 @@ const DeviceCard = ({ device, isConnected, isSelected, multiSelectMode, onConnec
       )}
       {isSelected && !isConnected && (
         <Check className="w-4 h-4 text-blue-400" />
+      )}
+      {onRemove && !isConnected && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
       )}
     </div>
   </motion.div>

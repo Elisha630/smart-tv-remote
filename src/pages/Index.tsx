@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useAdbConnection } from '@/hooks/useAdbConnection';
+import { useDirectAdb } from '@/hooks/useDirectAdb';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { Header } from '@/components/remote/Header';
 import { Trackpad } from '@/components/remote/Trackpad';
@@ -49,7 +49,9 @@ const Index = () => {
     startScreenMirror,
     stopScreenMirror,
     getScreenFrame,
-  } = useAdbConnection();
+    addDevice,
+    removeDevice,
+  } = useDirectAdb();
 
   const {
     shortcuts,
@@ -235,7 +237,7 @@ const Index = () => {
       </main>
 
       {/* Panels */}
-      <ConnectionPanel isOpen={showConnections} onClose={() => setShowConnections(false)} devices={discoveredDevices} isScanning={isScanning} onScan={scanNetwork} onConnect={connect} connectedDevice={state.device} connectedDevices={connectedDevices} onDisconnect={disconnect} onDisconnectDevice={handleDisconnectDevice} multiSelectMode={multiSelectMode} onToggleMultiSelect={handleToggleMultiSelect} selectedDevices={selectedDevices} onToggleDeviceSelection={handleToggleDeviceSelection} onConnectSelected={handleConnectSelected} />
+      <ConnectionPanel isOpen={showConnections} onClose={() => setShowConnections(false)} devices={discoveredDevices} isScanning={isScanning} onScan={scanNetwork} onConnect={connect} connectedDevice={state.device} connectedDevices={connectedDevices} onDisconnect={disconnect} onDisconnectDevice={handleDisconnectDevice} multiSelectMode={multiSelectMode} onToggleMultiSelect={handleToggleMultiSelect} selectedDevices={selectedDevices} onToggleDeviceSelection={handleToggleDeviceSelection} onConnectSelected={handleConnectSelected} onAddDevice={addDevice} onRemoveDevice={removeDevice} />
       <AppsPanel isOpen={showApps} onClose={() => setShowApps(false)} apps={apps} onRefresh={fetchApps} onLaunch={handleLaunchApp} isConnected={state.isConnected} />
       <MenuPanel isOpen={showMenu} onClose={() => setShowMenu(false)} onKey={sendKey} isConnected={state.isConnected} />
       <SetupPanel isOpen={showSetup} onClose={() => setShowSetup(false)} />
