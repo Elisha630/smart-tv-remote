@@ -23,6 +23,7 @@ import { SetupPanel } from '@/components/panels/SetupPanel';
 import { ShortcutsPanel } from '@/components/panels/ShortcutsPanel';
 import { Device } from '@/types/adb';
 import { toast } from 'sonner';
+import { Power } from 'lucide-react';
 
 const Index = () => {
   const {
@@ -64,17 +65,14 @@ const Index = () => {
   const [showSetup, setShowSetup] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   
-  // Multi-device state
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedDevices, setSelectedDevices] = useState<Device[]>([]);
   const [connectedDevices, setConnectedDevices] = useState<Device[]>([]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
       
-      // Check custom shortcuts
       const shortcut = shortcuts.find(s => s.key.toLowerCase() === e.key.toLowerCase());
       if (shortcut && state.isConnected) {
         e.preventDefault();
@@ -83,30 +81,15 @@ const Index = () => {
         return;
       }
 
-      // Default key mappings
       switch (e.key) {
-        case 'ArrowUp':
-          sendKey('KEYCODE_DPAD_UP');
-          break;
-        case 'ArrowDown':
-          sendKey('KEYCODE_DPAD_DOWN');
-          break;
-        case 'ArrowLeft':
-          sendKey('KEYCODE_DPAD_LEFT');
-          break;
-        case 'ArrowRight':
-          sendKey('KEYCODE_DPAD_RIGHT');
-          break;
-        case 'Enter':
-          sendKey('KEYCODE_DPAD_CENTER');
-          break;
+        case 'ArrowUp': sendKey('KEYCODE_DPAD_UP'); break;
+        case 'ArrowDown': sendKey('KEYCODE_DPAD_DOWN'); break;
+        case 'ArrowLeft': sendKey('KEYCODE_DPAD_LEFT'); break;
+        case 'ArrowRight': sendKey('KEYCODE_DPAD_RIGHT'); break;
+        case 'Enter': sendKey('KEYCODE_DPAD_CENTER'); break;
         case 'Escape':
-        case 'Backspace':
-          sendKey('KEYCODE_BACK');
-          break;
-        case 'Home':
-          sendKey('KEYCODE_HOME');
-          break;
+        case 'Backspace': sendKey('KEYCODE_BACK'); break;
+        case 'Home': sendKey('KEYCODE_HOME'); break;
         case ' ':
           e.preventDefault();
           sendKey('KEYCODE_MEDIA_PLAY_PAUSE');
@@ -131,7 +114,6 @@ const Index = () => {
     toast.success('App launched');
   }, [launchApp]);
 
-  // Multi-device handlers
   const handleToggleMultiSelect = useCallback(() => {
     setMultiSelectMode(prev => !prev);
     setSelectedDevices([]);
@@ -140,20 +122,14 @@ const Index = () => {
   const handleToggleDeviceSelection = useCallback((device: Device) => {
     setSelectedDevices(prev => {
       const exists = prev.some(d => d.id === device.id);
-      if (exists) {
-        return prev.filter(d => d.id !== device.id);
-      }
+      if (exists) return prev.filter(d => d.id !== device.id);
       return [...prev, device];
     });
   }, []);
 
   const handleConnectSelected = useCallback(() => {
-    selectedDevices.forEach(device => {
-      connect(device);
-    });
-    setConnectedDevices(prev => [...prev, ...selectedDevices.filter(
-      sd => !prev.some(pd => pd.id === sd.id)
-    )]);
+    selectedDevices.forEach(device => connect(device));
+    setConnectedDevices(prev => [...prev, ...selectedDevices.filter(sd => !prev.some(pd => pd.id === sd.id))]);
     setSelectedDevices([]);
     toast.success(`Connecting to ${selectedDevices.length} device(s)`);
   }, [selectedDevices, connect]);
@@ -164,23 +140,18 @@ const Index = () => {
     toast.info(`Disconnected from ${device.name}`);
   }, [disconnect]);
 
-  // Show error toast if connection fails
   useEffect(() => {
-    if (state.error) {
-      toast.error(state.error);
-    }
+    if (state.error) toast.error(state.error);
   }, [state.error]);
 
-  // Sync connected device to multi-device list
   useEffect(() => {
     if (state.device && !connectedDevices.some(d => d.id === state.device?.id)) {
       setConnectedDevices(prev => [...prev, state.device!]);
     }
-  }, [state.device]);
+  }, [state.device, connectedDevices]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col safe-area-inset">
-      {/* Header */}
+    <div className="h-screen bg-background flex flex-col safe-area-inset overflow-hidden">
       <Header
         device={state.device}
         isConnected={state.isConnected}
@@ -190,105 +161,69 @@ const Index = () => {
         onPowerClick={handlePowerOff}
       />
 
-      {/* Main Remote Area */}
-      <main className="flex-1 flex flex-col items-center justify-start p-4 gap-5 overflow-auto">
+      <main className="flex-1 flex flex-col items-center p-2 gap-3 overflow-y-auto overflow-x-hidden">
+        {/* Top Controls: Power & Wake */}
+        <div className="flex items-center gap-4 mt-1">
+          <motion.button
+            className={`remote-button p-3 flex items-center gap-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 ${!state.isConnected ? 'opacity-50 grayscale' : ''}`}
+            whileHover={!state.isConnected ? {} : { scale: 1.05 }}
+            whileTap={!state.isConnected ? {} : { scale: 0.95 }}
+            onClick={handlePowerOff}
+            disabled={!state.isConnected}
+            title="Power Off TV"
+          >
+            <Power className="w-5 h-5" />
+            <span className="text-xs font-bold">Power</span>
+          </motion.button>
+          <WakeOnLan 
+            onWake={wakeOnLan} 
+            savedMacAddress={savedMacAddress}
+            onSaveMac={saveMacAddress}
+          />
+        </div>
+
         {/* D-Pad and Volume/Channel */}
-        <motion.section
-          className="flex items-center justify-center gap-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        <motion.section className="flex items-center justify-center gap-4">
           <VolumeControls onKey={sendKey} disabled={!state.isConnected} />
           <DPad onKey={sendKey} disabled={!state.isConnected} />
           <ChannelControls onKey={sendKey} disabled={!state.isConnected} />
         </motion.section>
 
-        {/* Navigation Buttons */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        {/* Navigation & Media Controls */}
+        <div className="flex flex-col items-center gap-3 scale-90 sm:scale-100">
           <NavigationButtons
             onKey={sendKey}
             onAppsClick={() => setShowApps(true)}
             onMenuClick={() => setShowMenu(true)}
             disabled={!state.isConnected}
           />
-        </motion.section>
-
-        {/* Media Controls */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
           <MediaControls onKey={sendKey} disabled={!state.isConnected} />
-        </motion.section>
+        </div>
 
-        {/* Text & Voice Input for TV */}
-        <motion.section
-          className="w-full max-w-md flex flex-col items-center gap-3"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
+        {/* Text & Voice Input (Side by Side) */}
+        <div className="flex items-center justify-center gap-3 w-full max-w-md">
           <TextInput onSendText={sendText} disabled={!state.isConnected} />
           <VoiceInput onSendText={sendText} disabled={!state.isConnected} />
-        </motion.section>
+        </div>
 
         {/* Quick Launch Shortcuts */}
-        <motion.section
-          className="w-full max-w-lg"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
+        <div className="w-full max-w-lg px-2">
           <QuickLaunch
             shortcuts={shortcuts}
             onLaunch={handleLaunchApp}
             disabled={!state.isConnected}
           />
-        </motion.section>
+        </div>
 
-        {/* Extra Controls */}
-        <motion.section
-          className="flex items-center gap-3 flex-wrap justify-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <GamepadMode
-            onKey={sendKey}
-            onMove={moveCursor}
-            onTap={tap}
-            disabled={!state.isConnected}
-          />
-          <ScreenMirror
-            onStartMirror={startScreenMirror}
-            onStopMirror={stopScreenMirror}
-            onGetFrame={getScreenFrame}
-            isConnected={state.isConnected}
-          />
-          <ScreenshotButton 
-            onScreenshot={takeScreenshot} 
-            disabled={!state.isConnected} 
-          />
-          <WakeOnLan 
-            onWake={wakeOnLan} 
-            savedMacAddress={savedMacAddress}
-            onSaveMac={saveMacAddress}
-          />
-        </motion.section>
+        {/* Extra Utils Row (Compact) */}
+        <div className="flex items-center gap-2 flex-wrap justify-center scale-90">
+          <GamepadMode onKey={sendKey} onMove={moveCursor} onTap={tap} disabled={!state.isConnected} />
+          <ScreenMirror isConnected={state.isConnected} onStartMirror={startScreenMirror} onStopMirror={stopScreenMirror} onGetFrame={getScreenFrame} />
+          <ScreenshotButton onScreenshot={takeScreenshot} disabled={!state.isConnected} />
+        </div>
 
-        {/* Trackpad at Bottom */}
-        <motion.section
-          className="w-full max-w-md mt-auto"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
+        {/* Trackpad at Bottom - Compact size */}
+        <div className="w-full max-w-md mt-auto pb-2">
           <Trackpad
             onMove={moveCursor}
             onTap={tap}
@@ -296,58 +231,15 @@ const Index = () => {
             onKey={sendKey}
             disabled={!state.isConnected}
           />
-        </motion.section>
+        </div>
       </main>
 
       {/* Panels */}
-      <ConnectionPanel
-        isOpen={showConnections}
-        onClose={() => setShowConnections(false)}
-        devices={discoveredDevices}
-        isScanning={isScanning}
-        onScan={scanNetwork}
-        onConnect={connect}
-        connectedDevice={state.device}
-        connectedDevices={connectedDevices}
-        onDisconnect={disconnect}
-        onDisconnectDevice={handleDisconnectDevice}
-        multiSelectMode={multiSelectMode}
-        onToggleMultiSelect={handleToggleMultiSelect}
-        selectedDevices={selectedDevices}
-        onToggleDeviceSelection={handleToggleDeviceSelection}
-        onConnectSelected={handleConnectSelected}
-      />
-
-      <AppsPanel
-        isOpen={showApps}
-        onClose={() => setShowApps(false)}
-        apps={apps}
-        onRefresh={fetchApps}
-        onLaunch={handleLaunchApp}
-        isConnected={state.isConnected}
-      />
-
-      <MenuPanel
-        isOpen={showMenu}
-        onClose={() => setShowMenu(false)}
-        onKey={sendKey}
-        isConnected={state.isConnected}
-      />
-
-      <SetupPanel
-        isOpen={showSetup}
-        onClose={() => setShowSetup(false)}
-      />
-
-      <ShortcutsPanel
-        isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
-        shortcuts={shortcuts}
-        onAdd={addShortcut}
-        onUpdate={updateShortcut}
-        onRemove={removeShortcut}
-        onReset={resetToDefaults}
-      />
+      <ConnectionPanel isOpen={showConnections} onClose={() => setShowConnections(false)} devices={discoveredDevices} isScanning={isScanning} onScan={scanNetwork} onConnect={connect} connectedDevice={state.device} connectedDevices={connectedDevices} onDisconnect={disconnect} onDisconnectDevice={handleDisconnectDevice} multiSelectMode={multiSelectMode} onToggleMultiSelect={handleToggleMultiSelect} selectedDevices={selectedDevices} onToggleDeviceSelection={handleToggleDeviceSelection} onConnectSelected={handleConnectSelected} />
+      <AppsPanel isOpen={showApps} onClose={() => setShowApps(false)} apps={apps} onRefresh={fetchApps} onLaunch={handleLaunchApp} isConnected={state.isConnected} />
+      <MenuPanel isOpen={showMenu} onClose={() => setShowMenu(false)} onKey={sendKey} isConnected={state.isConnected} />
+      <SetupPanel isOpen={showSetup} onClose={() => setShowSetup(false)} />
+      <ShortcutsPanel isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} shortcuts={shortcuts} onAdd={addShortcut} onUpdate={updateShortcut} onRemove={removeShortcut} onReset={resetToDefaults} />
     </div>
   );
 };

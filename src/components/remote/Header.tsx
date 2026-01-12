@@ -1,4 +1,4 @@
-import { Tv, Info, Power, Settings, Wifi } from 'lucide-react';
+import { Tv, Info, Settings, Wifi } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Device } from '@/types/adb';
 
@@ -8,7 +8,7 @@ interface HeaderProps {
   onConnectionClick: () => void;
   onSetupClick: () => void;
   onSettingsClick: () => void;
-  onPowerClick: () => void;
+  onPowerClick: () => void; // Kept in props for now to avoid breaking Index.tsx during transition
 }
 
 export const Header = ({
@@ -17,10 +17,9 @@ export const Header = ({
   onConnectionClick,
   onSetupClick,
   onSettingsClick,
-  onPowerClick,
 }: HeaderProps) => {
   return (
-    <header className="glass-panel px-4 py-3 flex items-center justify-between">
+    <header className="glass-panel px-4 py-2 flex items-center justify-between">
       {/* Logo & Connection Status */}
       <div className="flex items-center gap-3">
         <motion.div
@@ -38,11 +37,6 @@ export const Header = ({
             </span>
             <div className={`connection-dot ${isConnected ? 'connected' : 'disconnected'}`} />
           </div>
-          {device && (
-            <span className="text-xs text-muted-foreground">
-              {device.ip}:{device.port}
-            </span>
-          )}
         </div>
       </div>
 
@@ -50,13 +44,6 @@ export const Header = ({
       <div className="flex items-center gap-1">
         <HeaderButton icon={Tv} onClick={onConnectionClick} tooltip="Connections" />
         <HeaderButton icon={Info} onClick={onSetupClick} tooltip="Setup Guide" />
-        <HeaderButton 
-          icon={Power} 
-          onClick={onPowerClick} 
-          tooltip="Power Off TV"
-          variant="destructive"
-          disabled={!isConnected}
-        />
         <HeaderButton icon={Settings} onClick={onSettingsClick} tooltip="Shortcuts" />
       </div>
     </header>

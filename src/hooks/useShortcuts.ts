@@ -1,11 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RemoteShortcut, KeyCode } from '@/types/adb';
+import { RemoteShortcut } from '@/types/adb';
 
 const DEFAULT_SHORTCUTS: RemoteShortcut[] = [
-  { id: '1', name: 'Netflix', key: 'n', command: 'com.netflix.ninja', icon: '🎬' },
-  { id: '2', name: 'YouTube', key: 'y', command: 'com.google.android.youtube.tv', icon: '▶️' },
-  { id: '3', name: 'Prime Video', key: 'p', command: 'com.amazon.amazonvideo.livingroom', icon: '📺' },
-  { id: '4', name: 'Plex', key: 'x', command: 'com.plexapp.android', icon: '🎞️' },
+  { 
+    id: '1', 
+    name: 'Netflix', 
+    key: 'n', 
+    command: 'com.netflix.ninja', 
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/0/0c/Netflix_2015_N_logo.svg' 
+  },
+  { 
+    id: '2', 
+    name: 'YouTube', 
+    key: 'y', 
+    command: 'com.google.android.youtube.tv', 
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg' 
+  },
+  { 
+    id: '3', 
+    name: 'Prime Video', 
+    key: 'p', 
+    command: 'com.amazon.amazonvideo.livingroom', 
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/1/11/Amazon_Prime_Video_logo.svg' 
+  },
+  { 
+    id: '4', 
+    name: 'Plex', 
+    key: 'x', 
+    command: 'com.plexapp.android', 
+    icon: 'https://www.vectorlogo.zone/logos/plex/plex-icon.svg' 
+  },
 ];
 
 const STORAGE_KEY = 'tv_remote_shortcuts';
