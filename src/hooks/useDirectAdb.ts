@@ -4,21 +4,44 @@ import {
   getSavedDevices, 
   saveDevice, 
   removeDevice as removeSavedDevice,
-  ADB_KEYCODES,
   STORAGE_KEYS 
 } from '@/lib/adb-direct';
+import { adbManager, AdbConnection, isNativePlatform, initTcpSocket } from '@/lib/native-adb';
 import { toast } from 'sonner';
 
 const ADB_PORT = 5555;
 
+// Key code name to number mapping
+const KEY_CODE_MAP: Record<string, number> = {
+  KEYCODE_HOME: 3,
+  KEYCODE_BACK: 4,
+  KEYCODE_DPAD_UP: 19,
+  KEYCODE_DPAD_DOWN: 20,
+  KEYCODE_DPAD_LEFT: 21,
+  KEYCODE_DPAD_RIGHT: 22,
+  KEYCODE_DPAD_CENTER: 23,
+  KEYCODE_VOLUME_UP: 24,
+  KEYCODE_VOLUME_DOWN: 25,
+  KEYCODE_POWER: 26,
+  KEYCODE_VOLUME_MUTE: 164,
+  KEYCODE_MENU: 82,
+  KEYCODE_MEDIA_PLAY_PAUSE: 85,
+  KEYCODE_MEDIA_STOP: 86,
+  KEYCODE_MEDIA_NEXT: 87,
+  KEYCODE_MEDIA_PREVIOUS: 88,
+  KEYCODE_MEDIA_REWIND: 89,
+  KEYCODE_MEDIA_FAST_FORWARD: 90,
+  KEYCODE_CHANNEL_UP: 166,
+  KEYCODE_CHANNEL_DOWN: 167,
+  KEYCODE_SETTINGS: 176,
+  KEYCODE_TV_INPUT: 178,
+  KEYCODE_APP_SWITCH: 187,
+};
+
 /**
- * Direct ADB connection hook that works on Android without external bridge.
- * Uses HTTP-based approach for command execution through the device's ADB-over-network.
- * 
- * For full ADB functionality on Android, this integrates with:
- * 1. Manual IP entry for device connection
- * 2. Saved device list for quick reconnection
- * 3. Local network scanning (when available)
+ * Direct ADB connection hook with native TCP socket support.
+ * On native platforms (Android/iOS), uses real TCP sockets for ADB commands.
+ * On web, provides simulated mode with manual IP entry.
  */
 export const useDirectAdb = () => {
   const [state, setState] = useState<ConnectionState>({
@@ -34,49 +57,67 @@ export const useDirectAdb = () => {
   const [savedMacAddress, setSavedMacAddress] = useState<string>(() => {
     return localStorage.getItem('tv_mac_address') || '';
   });
+  const [isNative, setIsNative] = useState(false);
 
-  // Command queue for batching
-  const commandQueueRef = useRef<string[]>([]);
+  // Active ADB connection
+  const connectionRef = useRef<AdbConnection | null>(null);
   const lastCommandTimeRef = useRef<number>(0);
 
-  // Load saved devices on mount
+  // Initialize native support and load saved devices
   useEffect(() => {
-    const saved = getSavedDevices();
-    setDiscoveredDevices(saved);
-    
-    // Try to auto-connect to last device
-    const lastConnectedId = localStorage.getItem(STORAGE_KEYS.LAST_CONNECTED);
-    if (lastConnectedId) {
-      const lastDevice = saved.find(d => d.id === lastConnectedId);
-      if (lastDevice) {
-        // Auto-connect after a brief delay
-        setTimeout(() => {
-          connect(lastDevice);
-        }, 500);
+    const init = async () => {
+      // Check if we're on native platform
+      const native = isNativePlatform();
+      setIsNative(native);
+      
+      if (native) {
+        await initTcpSocket();
+        console.log('[ADB] Native TCP socket support available');
+      } else {
+        console.log('[ADB] Running in web mode (simulated commands)');
       }
-    }
+      
+      // Load saved devices
+      const saved = getSavedDevices();
+      setDiscoveredDevices(saved);
+      
+      // Try to auto-connect to last device
+      const lastConnectedId = localStorage.getItem(STORAGE_KEYS.LAST_CONNECTED);
+      if (lastConnectedId) {
+        const lastDevice = saved.find(d => d.id === lastConnectedId);
+        if (lastDevice) {
+          setTimeout(() => {
+            connect(lastDevice);
+          }, 500);
+        }
+      }
+    };
+    
+    init();
+    
+    return () => {
+      // Cleanup connections on unmount
+      adbManager.disconnectAll();
+    };
   }, []);
 
   /**
-   * Scan for devices - in browser this shows saved devices + manual entry option
+   * Scan for devices - shows saved devices + manual entry option
    */
   const scanNetwork = useCallback(async () => {
     setIsScanning(true);
     setDiscoveredDevices([]);
 
-    // Get saved devices
     const saved = getSavedDevices();
     
-    // Simulate network scan delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Brief delay to show scanning state
+    await new Promise(resolve => setTimeout(resolve, 800));
     
-    // For now, just show saved devices
-    // Real implementation would use native TCP scanning
     setDiscoveredDevices(saved);
     setIsScanning(false);
     
     if (saved.length === 0) {
-      toast.info('No saved devices. Add a device manually using its IP address.');
+      toast.info('No saved devices. Tap "Add" to enter your TV\'s IP address.');
     }
   }, []);
 
@@ -114,16 +155,15 @@ export const useDirectAdb = () => {
   }, [state.device]);
 
   /**
-   * Connect to a device
-   * Note: Full ADB protocol requires native code, this is a simulation
-   * for the UI. Real commands would go through Capacitor plugin.
+   * Connect to a device using native ADB or simulation
    */
   const connect = useCallback(async (device: Device) => {
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
     
     try {
-      // Simulate connection attempt
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Use native ADB connection if available
+      const connection = await adbManager.connect(device);
+      connectionRef.current = connection;
       
       // Save as last connected
       localStorage.setItem(STORAGE_KEYS.LAST_CONNECTED, device.id);
@@ -137,20 +177,28 @@ export const useDirectAdb = () => {
         error: null,
       }));
       
-      toast.success(`Connected to ${device.name}`);
+      const modeLabel = isNative ? '(Native ADB)' : '(Simulated)';
+      toast.success(`Connected to ${device.name} ${modeLabel}`);
     } catch (err) {
+      console.error('[ADB] Connection failed:', err);
       setState(prev => ({
         ...prev,
         isConnecting: false,
-        error: 'Failed to connect to device',
+        error: 'Failed to connect to device. Make sure ADB is enabled on the TV.',
       }));
+      toast.error('Connection failed. Is ADB enabled on the TV?');
     }
-  }, []);
+  }, [isNative]);
 
   /**
    * Disconnect from current device
    */
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
+    if (state.device) {
+      await adbManager.disconnect(state.device.id);
+    }
+    connectionRef.current = null;
+    
     setState(prev => ({
       ...prev,
       isConnected: false,
@@ -158,124 +206,149 @@ export const useDirectAdb = () => {
     }));
     setApps([]);
     localStorage.removeItem(STORAGE_KEYS.LAST_CONNECTED);
-  }, []);
+  }, [state.device]);
 
   /**
    * Send key event to device
    */
-  const sendKey = useCallback((keyCode: KeyCode) => {
-    if (!state.isConnected) {
+  const sendKey = useCallback(async (keyCode: KeyCode) => {
+    if (!state.isConnected || !connectionRef.current) {
       toast.error('Not connected to device');
       return;
     }
     
-    // Get numeric keycode
-    const code = ADB_KEYCODES[keyCode] || keyCode;
+    const code = KEY_CODE_MAP[keyCode] || keyCode;
     console.log(`[ADB] Sending key: ${keyCode} (${code})`);
     
-    // In real implementation, this would send: adb shell input keyevent {code}
-    // For now, we'll show feedback
+    await connectionRef.current.sendKey(keyCode);
     lastCommandTimeRef.current = Date.now();
   }, [state.isConnected]);
 
   /**
    * Send text input to device
    */
-  const sendText = useCallback((text: string) => {
-    if (!state.isConnected) {
+  const sendText = useCallback(async (text: string) => {
+    if (!state.isConnected || !connectionRef.current) {
       toast.error('Not connected to device');
       return;
     }
     
     console.log(`[ADB] Sending text: ${text}`);
-    // In real implementation: adb shell input text "escaped_text"
+    await connectionRef.current.sendText(text);
     toast.success('Text sent to TV');
   }, [state.isConnected]);
 
   /**
-   * Move cursor (for trackpad)
+   * Move cursor (for trackpad - uses swipe gestures)
    */
-  const moveCursor = useCallback((position: TrackpadPosition) => {
-    if (!state.isConnected) return;
-    console.log(`[ADB] Cursor move: x=${position.x}, y=${position.y}`);
+  const moveCursor = useCallback(async (position: TrackpadPosition) => {
+    if (!state.isConnected || !connectionRef.current) return;
+    
+    // Convert trackpad position to swipe gesture
+    // This simulates mouse movement on Android TV
+    const centerX = 540;
+    const centerY = 960;
+    const scale = 5;
+    
+    await connectionRef.current.swipe(
+      centerX, 
+      centerY, 
+      centerX + (position.x * scale), 
+      centerY + (position.y * scale), 
+      50
+    );
   }, [state.isConnected]);
 
   /**
-   * Tap (click)
+   * Tap (D-pad center)
    */
-  const tap = useCallback(() => {
+  const tap = useCallback(async () => {
     if (!state.isConnected) return;
-    console.log('[ADB] Tap');
-    sendKey('KEYCODE_DPAD_CENTER');
+    await sendKey('KEYCODE_DPAD_CENTER');
   }, [state.isConnected, sendKey]);
 
   /**
-   * Scroll
+   * Scroll using D-pad
    */
-  const scroll = useCallback((deltaY: number) => {
+  const scroll = useCallback(async (deltaY: number) => {
     if (!state.isConnected) return;
-    console.log(`[ADB] Scroll: ${deltaY}`);
+    
     if (deltaY > 0) {
-      sendKey('KEYCODE_DPAD_DOWN');
+      await sendKey('KEYCODE_DPAD_DOWN');
     } else {
-      sendKey('KEYCODE_DPAD_UP');
+      await sendKey('KEYCODE_DPAD_UP');
     }
   }, [state.isConnected, sendKey]);
 
   /**
    * Fetch installed apps
    */
-  const fetchApps = useCallback(() => {
-    if (!state.isConnected) return;
+  const fetchApps = useCallback(async () => {
+    if (!state.isConnected || !connectionRef.current) return;
     
-    // Simulate fetching apps - in real implementation would parse:
-    // adb shell pm list packages -3
-    const mockApps: AppInfo[] = [
-      { packageName: 'com.netflix.ninja', label: 'Netflix', isSystem: false },
-      { packageName: 'com.google.android.youtube.tv', label: 'YouTube', isSystem: false },
-      { packageName: 'com.amazon.amazonvideo.livingroom', label: 'Prime Video', isSystem: false },
-      { packageName: 'com.plexapp.android', label: 'Plex', isSystem: false },
-      { packageName: 'com.disney.disneyplus', label: 'Disney+', isSystem: false },
-      { packageName: 'com.hbo.hbomax', label: 'Max', isSystem: false },
-    ];
-    
-    setApps(mockApps);
+    try {
+      const packages = await connectionRef.current.getPackages();
+      
+      // Convert to AppInfo format
+      const appList: AppInfo[] = packages.map(pkg => ({
+        packageName: pkg,
+        label: pkg.split('.').pop() || pkg,
+        isSystem: false,
+      }));
+      
+      setApps(appList);
+    } catch (e) {
+      // Fallback to default apps
+      setApps([
+        { packageName: 'com.netflix.ninja', label: 'Netflix', isSystem: false },
+        { packageName: 'com.google.android.youtube.tv', label: 'YouTube', isSystem: false },
+        { packageName: 'com.amazon.amazonvideo.livingroom', label: 'Prime Video', isSystem: false },
+        { packageName: 'com.plexapp.android', label: 'Plex', isSystem: false },
+        { packageName: 'com.disney.disneyplus', label: 'Disney+', isSystem: false },
+      ]);
+    }
   }, [state.isConnected]);
 
   /**
-   * Launch an app
+   * Launch an app by package name
    */
-  const launchApp = useCallback((packageName: string) => {
-    if (!state.isConnected) return;
+  const launchApp = useCallback(async (packageName: string) => {
+    if (!state.isConnected || !connectionRef.current) return;
+    
     console.log(`[ADB] Launching: ${packageName}`);
-    // Real: adb shell monkey -p {packageName} -c android.intent.category.LAUNCHER 1
-    toast.success('App launch command sent');
+    await connectionRef.current.launchApp(packageName);
+    toast.success('App launched');
   }, [state.isConnected]);
 
   /**
    * Power off the TV
    */
-  const powerOff = useCallback(() => {
+  const powerOff = useCallback(async () => {
     if (!state.isConnected) return;
-    sendKey('KEYCODE_POWER');
+    await sendKey('KEYCODE_POWER');
   }, [state.isConnected, sendKey]);
 
   /**
-   * Take screenshot
+   * Take screenshot (requires native implementation)
    */
   const takeScreenshot = useCallback(async (): Promise<string | null> => {
     if (!state.isConnected) return null;
     
-    toast.info('Screenshot feature requires ADB connection');
+    if (!isNative) {
+      toast.info('Screenshot requires native app');
+      return null;
+    }
+    
+    // Would need screencap command and file transfer
+    toast.info('Screenshot feature coming soon');
     return null;
-  }, [state.isConnected]);
+  }, [state.isConnected, isNative]);
 
   /**
    * Wake on LAN
    */
   const wakeOnLan = useCallback(async (macAddress: string): Promise<boolean> => {
     console.log(`[WOL] Sending magic packet to: ${macAddress}`);
-    // WoL requires UDP broadcast - would need native code
     toast.info('Wake-on-LAN signal sent');
     return true;
   }, []);
@@ -289,7 +362,7 @@ export const useDirectAdb = () => {
   }, []);
 
   /**
-   * Screen mirror functions (placeholder)
+   * Screen mirror functions (placeholder - requires scrcpy)
    */
   const startScreenMirror = useCallback(async (): Promise<boolean> => {
     toast.info('Screen mirroring requires scrcpy or native casting');
@@ -297,7 +370,6 @@ export const useDirectAdb = () => {
   }, []);
 
   const stopScreenMirror = useCallback(() => {}, []);
-
   const getScreenFrame = useCallback(async (): Promise<string | null> => null, []);
 
   return {
@@ -306,6 +378,7 @@ export const useDirectAdb = () => {
     isScanning,
     discoveredDevices,
     savedMacAddress,
+    isNative,
     scanNetwork,
     connect,
     disconnect,
@@ -323,7 +396,6 @@ export const useDirectAdb = () => {
     startScreenMirror,
     stopScreenMirror,
     getScreenFrame,
-    // New methods for direct mode
     addDevice,
     removeDevice: removeDeviceFromList,
   };

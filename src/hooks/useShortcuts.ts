@@ -7,28 +7,28 @@ const DEFAULT_SHORTCUTS: RemoteShortcut[] = [
     name: 'Netflix', 
     key: 'n', 
     command: 'com.netflix.ninja', 
-    icon: 'https://cdn.jsdelivr.net/gh/AminJun/Netflix-Icon@main/Netflix.png'
+    icon: '🔴' // Netflix red
   },
   { 
     id: '2', 
     name: 'YouTube', 
     key: 'y', 
     command: 'com.google.android.youtube.tv', 
-    icon: 'https://www.gstatic.com/youtube/img/branding/youtubelogo/svg/youtubelogo.svg' 
+    icon: '▶️' // YouTube play
   },
   { 
     id: '3', 
-    name: 'Prime Video', 
+    name: 'Prime', 
     key: 'p', 
     command: 'com.amazon.amazonvideo.livingroom', 
-    icon: 'https://m.media-amazon.com/images/G/01/digital/video/acquisition/amazon_video_light_on_dark.png' 
+    icon: '📺' // Prime Video
   },
   { 
     id: '4', 
     name: 'Plex', 
     key: 'x', 
     command: 'com.plexapp.android', 
-    icon: 'https://www.plex.tv/wp-content/uploads/2018/01/pmp-icon-1.png'
+    icon: '🎬' // Plex
   },
 ];
 
